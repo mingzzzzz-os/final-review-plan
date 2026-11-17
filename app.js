@@ -103,8 +103,12 @@ function todayTasks() {
   /* 阶段 A：六级 + 铺底 */
   const wd = TODAY.getDay();
   const isMock = MOCK_DAYS.includes(TODAY_STR);
+  const dayPlan = (typeof CET6_DAILY !== "undefined") ? CET6_DAILY[TODAY_STR] : null;
+  const dayFocus = dayPlan && dayPlan.focus ? dayPlan.focus : "";
   let tasks;
-  if (isMock) {
+  if (dayPlan) {
+    tasks = dayPlan.tasks.map(x => ({ ...x }));
+  } else if (isMock) {
     tasks = [
       { t: "09:00-10:00", name: "本周错题回看", detail: "只翻错题，不做新题。" },
       { t: "10:10-11:40", name: "作文 + 翻译", detail: "各写一篇，限时。" },
@@ -117,17 +121,15 @@ function todayTasks() {
     tasks = CET6_WEEKDAY.map(x => ({ ...x }));
   }
 
-  /* 期末铺底 */
+  /* 期末铺底：模考日和最后一周不加，免得挤掉六级 */
   const fo = FOUNDATION.find(f => inRange(TODAY_STR, f.from, f.to));
-  if (fo && !isMock) {
+  const skipFoundation = isMock || TODAY_STR >= "2026-12-07";
+  if (fo && !skipFoundation) {
     tasks.push({ t: "21:00-21:50", name: `期末铺底 · ${fo.subject}`, detail: fo.task });
-  } else if (fo && isMock) {
-    tasks.push({ t: "20:40-21:40", name: `期末铺底 · ${fo.subject}`, detail: fo.task });
   }
 
-  let note = "六级冲刺期：六级为主，期末只铺底。今天六级的事做完，期末那 50 分钟尽力就行。";
-  if (TODAY_STR === "2026-12-11") note = "六级考前一天：只过模板和错题，早睡。明天 15:00 考试。";
-  if (TODAY_STR === "2026-12-01") note += "　另外：今天 9 点起可以打印六级笔试准考证了。";
+  let note = dayFocus || "六级冲刺期：六级为主，期末只铺底。今天六级的事做完，期末那 50 分钟尽力就行。";
+  if (!dayPlan && TODAY_STR === "2026-12-01") note += "　另外：今天 9 点起可以打印六级笔试准考证了。";
 
   return { note, tasks };
 }
@@ -205,6 +207,36 @@ function renderPlan() {
       <div class="gl">${p.goal}</div>
     </div>`;
   }).join("");
+
+  /* 六级 25 天逐日表 */
+  const cetWrap = document.getElementById("cet6list");
+  if (cetWrap && typeof CET6_DAILY !== "undefined") {
+    const WEEKS = [
+      ["第 1 周 · 摸底 + 听力入门", "2026-11-17", "2026-11-22"],
+      ["第 2 周 · 讲座专项", "2026-11-23", "2026-11-29"],
+      ["第 3 周 · 阅读提速 + 作文定型", "2026-11-30", "2026-12-06"],
+      ["第 4 周 · 只保温不做新题", "2026-12-07", "2026-12-12"],
+    ];
+    const WD2 = ["日", "一", "二", "三", "四", "五", "六"];
+    cetWrap.innerHTML = WEEKS.map(([label, a, b]) => {
+      const days = Object.keys(CET6_DAILY).filter(k => k >= a && k <= b).sort();
+      const body = days.map(k => {
+        const dt = new Date(k + "T00:00:00");
+        const cls = k === TODAY_STR ? " now" : (k < TODAY_STR ? " past" : "");
+        const items = CET6_DAILY[k].tasks
+          .map(t => `<li><b>${t.t}</b>　${t.name}</li>`).join("");
+        return `<div class="cd${cls}">
+          <div class="ch">${dt.getMonth() + 1}/${dt.getDate()} 周${WD2[dt.getDay()]}
+            ${k === TODAY_STR ? '<span class="nowtag">今天</span>' : ""}</div>
+          <div class="cf">${CET6_DAILY[k].focus}</div>
+          <ul class="ct">${items}</ul>
+        </div>`;
+      }).join("");
+      const open = TODAY_STR >= a && TODAY_STR <= b ? " open" : "";
+      return `<details class="wk"${open}><summary><span class="lb">${label}</span><span class="rg">${a.slice(5).replace("-", "/")} – ${b.slice(5).replace("-", "/")}</span></summary>
+        ${body}</details>`;
+    }).join("");
+  }
 
   /* 科目块 */
   const wrap = document.getElementById("blocks");
