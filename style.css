@@ -333,6 +333,61 @@ nav button.on { color: var(--green); font-weight: 600; }
   body { font-size: 16px; }
 }
 
+/* ---------- 六级 25 天逐日表 ---------- */
+.wk { border-top: 1px solid var(--line); }
+.wk:first-child { border-top: 0; }
+.wk summary {
+  list-style: none;
+  display: block;
+  position: relative;
+  padding: 12px 0 11px 18px;
+  cursor: pointer;
+}
+.wk summary::-webkit-details-marker { display: none; }
+.wk summary::marker { content: ""; }
+.wk summary::before {
+  content: "＋";
+  position: absolute; left: 0; top: 11px;
+  color: var(--mute); font-size: 13px; font-weight: 400;
+}
+.wk[open] summary::before { content: "－"; }
+.wk summary .lb {
+  display: block;
+  font-weight: 600; font-size: 14.5px;
+  line-height: 1.45;
+}
+.wk summary .rg {
+  display: block;
+  font-size: 11.5px; color: var(--mute);
+  margin-top: 1px; font-variant-numeric: tabular-nums;
+}
+
+.cd {
+  padding: 9px 0 11px 13px;
+  margin-left: 3px;
+  border-left: 2px solid var(--line);
+}
+.cd.now { border-left-color: var(--orange); background: #FDF7F2; border-radius: 0 6px 6px 0; }
+.cd.past { opacity: 0.45; }
+.ch {
+  font-size: 13.5px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.cf {
+  font-size: 12.5px; color: var(--blue);
+  margin: 3px 0 5px; line-height: 1.55;
+}
+.ct { margin: 0; padding-left: 15px; }
+.ct li {
+  font-size: 12.5px; color: var(--soft);
+  line-height: 1.7; margin-bottom: 1px;
+}
+.ct li b {
+  color: var(--ink); font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 打印 */
 @media print {
   nav { display: none; }
