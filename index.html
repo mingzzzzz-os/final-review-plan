@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F6F5F1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>期末复习计划</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>期末复习计划</h1>
+    <p class="sub">六级 12/12 · 期末 1/5 起 · 六门课 + 英语</p>
+  </header>
+
+  <!-- ============ 今天 ============ -->
+  <section class="page on" id="page-today">
+
+    <div class="counters">
+      <div class="counter c6" id="c-cet">
+        <div class="label"><b>英语六级</b><span>12/12 15:00</span></div>
+        <div class="num"><span id="d-cet">—</span><small>天</small></div>
+      </div>
+      <div class="counter fn" id="c-fin">
+        <div class="label"><b>期末首场</b><span>1/5 起</span></div>
+        <div class="num"><span id="d-fin">—</span><small>天</small></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="datebar">
+        <span class="day" id="today-label">—</span>
+        <span class="phase" id="phase-label">—</span>
+      </div>
+      <div class="phase-note" id="phase-note"></div>
+      <div id="task-list"></div>
+      <div class="progress">
+        <div class="bar"><i id="bar"></i></div>
+        <span id="prog-text">0 / 0</span>
+      </div>
+    </div>
+
+    <div class="card" id="card-mock" style="display:none">
+      <h2>今天有全真模考 <span class="tag">15:00 开始</span></h2>
+      <p class="sub" style="font-size:13px;color:var(--soft)">
+        和真实考试同一时段，做完再复盘。中途不看手机、不上厕所、不查词。
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>六条规矩 <span class="tag">不破</span></h2>
+      <div id="rules"></div>
+    </div>
+  </section>
+
+  <!-- ============ 全程 ============ -->
+  <section class="page" id="page-plan">
+    <div class="card">
+      <h2>五个阶段</h2>
+      <div class="tl" id="timeline"></div>
+    </div>
+
+    <div class="card">
+      <h2>科目时间块 <span class="tag">12/13 起</span></h2>
+      <div id="blocks"></div>
+    </div>
+
+    <div class="card">
+      <h2>考试安排 <span class="tag">日期待教务确认</span></h2>
+      <div id="exams"></div>
+    </div>
+  </section>
+
+  <!-- ============ 科目 ============ -->
+  <section class="page" id="page-subjects">
+    <div id="subjects"></div>
+    <div class="card">
+      <h2>时间怎么分的</h2>
+      <p style="font-size:13.5px;color:var(--soft);line-height:1.7;margin:0">
+        六门课总量差得远：材料物理化学内容最多、最陌生，给 11 天；
+        电工电子学计算量大但题型固定，给 10 天；理论力学你有真题 1/2/3 打底，8 天；
+        概率论和计算方法期中刚练过，各 5 天；马原靠背诵突击，4 天。
+        这些数字是「第一轮 + 第二轮」的合计，不是连续天数。
+      </p>
+    </div>
+  </section>
+
+</div>
+
+<nav>
+  <button class="on" data-page="today"><span class="ic">◎</span>今天</button>
+  <button data-page="plan"><span class="ic">≡</span>全程</button>
+  <button data-page="subjects"><span class="ic">▤</span>科目</button>
+</nav>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
