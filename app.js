@@ -125,7 +125,8 @@ function todayTasks() {
   const fo = FOUNDATION.find(f => inRange(TODAY_STR, f.from, f.to));
   const skipFoundation = isMock || TODAY_STR >= "2026-12-07";
   if (fo && !skipFoundation) {
-    tasks.push({ t: "21:00-21:50", name: `期末铺底 · ${fo.subject}`, detail: fo.task });
+    const fday = fo.days ? fo.days[daysBetween(fo.from, TODAY_STR)] : null;
+    tasks.push({ t: "21:00-21:50", name: `期末铺底 · ${fo.subject}`, detail: fday || fo.task });
   }
 
   let note = dayFocus || "六级冲刺期：六级为主，期末只铺底。今天六级的事做完，期末那 50 分钟尽力就行。";
@@ -282,6 +283,7 @@ function renderSubjects() {
         <span class="df">${s.diff} · ${s.days} 天</span>
       </div>
       <div class="why">${s.why}</div>
+      ${s.res ? `<div class="res">${s.res}</div>` : ""}
       <div class="row">
         <span class="k">必拿</span>
         <span class="klist">${s.key.map(k => `<span>${k}</span>`).join("")}</span>
