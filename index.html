@@ -54,6 +54,19 @@
       <h2>八条规矩 <span class="tag">不破</span></h2>
       <div id="rules"></div>
     </div>
+
+    <div class="card">
+      <h2>进度备份 <span class="tag">换手机、清缓存前点一次</span></h2>
+      <p class="sub" style="font-size:13px;color:var(--soft)">
+        打卡记录存在这台设备的浏览器里。清缓存、换手机、换浏览器都会丢。导出一次是个 .json 文件，存哪都行。
+      </p>
+      <div class="bkrow">
+        <button class="bkbtn" id="bk-exp">导出备份</button>
+        <button class="bkbtn ghost" id="bk-imp">导入备份</button>
+        <input id="bk-file" type="file" accept=".json" hidden>
+      </div>
+      <div class="bktip" id="bk-tip"></div>
+    </div>
   </section>
 
   <!-- ============ 全程 ============ -->
@@ -61,6 +74,11 @@
     <div class="card">
       <h2>五个阶段</h2>
       <div class="tl" id="timeline"></div>
+    </div>
+
+    <div class="card">
+      <h2>六级分项 <span class="tag">你四级 541</span></h2>
+      <div id="cetparts"></div>
     </div>
 
     <div class="card">
