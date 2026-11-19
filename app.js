@@ -205,6 +205,7 @@ function renderPlan() {
     return `<div class="tl-item${now ? " now" : ""}" style="--ph:${p.color}">
       <div class="ph">${p.id}　${p.name}${now ? '<span class="nowtag">当前</span>' : ""}
         <span class="rg">${rg}</span></div>
+      ${typeof PHASE_SUB !== "undefined" && PHASE_SUB[p.id] ? `<div class="psub">${PHASE_SUB[p.id]}</div>` : ""}
       <div class="gl">${p.goal}</div>
     </div>`;
   }).join("");
@@ -274,14 +275,151 @@ function renderPlan() {
         再按「先考的先二刷」调一下 D 阶段的顺序。</p>`;
 }
 
+/* ==========================================================
+   进度追踪：分P打卡
+   状态存在 localStorage 的 track:v1，键 = 课程id:组序:条序
+   值 d = 已看，s = 暂不学（从分母里扣），空 = 未看
+   ========================================================== */
+const TK_KEY = "track:v1";
+let TS = (() => { try { return JSON.parse(localStorage.getItem(TK_KEY) || "{}"); } catch (e) { return {}; } })();
+const saveTS = () => { try { localStorage.setItem(TK_KEY, JSON.stringify(TS)); } catch (e) { } };
+const tkey = (id, gi, ii) => id + ":" + gi + ":" + ii;
+/* 记住哪些清单是展开的，重绘后保持展开，不然勾一节就收起一次 */
+let OPENED = new Set();
+
+function stOf(t, gi, ii, it) {
+  const k = tkey(t.id, gi, ii);
+  if (k in TS) return TS[k];
+  if (it.sk) return "s";
+  if (it.d) return "d";
+  return "";
+}
+
+function trackStats(t) {
+  let doneCnt = 0, needCnt = 0, skipCnt = 0, doneM = 0, needM = 0, allCnt = 0;
+  t.groups.forEach((g, gi) => g.items.forEach((it, ii) => {
+    allCnt++;
+    const s = stOf(t, gi, ii, it);
+    if (s === "s") { skipCnt++; return; }
+    needCnt++;
+    needM += it.m || 0;
+    if (s === "d") { doneCnt++; doneM += it.m || 0; }
+  }));
+  const byCount = !!t.byCount || needM === 0;
+  const pct = needCnt ? doneCnt / needCnt : 1;
+  const days = Math.max(1, daysBetween(TODAY_STR, t.due) + 1);
+  return {
+    doneCnt, needCnt, skipCnt, allCnt, doneM, needM, pct, byCount, days,
+    leftM: Math.max(0, needM - doneM),
+    leftCnt: Math.max(0, needCnt - doneCnt)
+  };
+}
+
+const hm = m => (m >= 60 ? Math.floor(m / 60) + "h" + (Math.round(m % 60) ? Math.round(m % 60) + "m" : "") : Math.round(m) + "m");
+
+function trackHTML(t) {
+  const s = trackStats(t);
+  const pct = Math.round(s.pct * 100);
+  // 进度条按「节数」画：绿=已看，黄=暂不学，剩下灰=未看
+  const allC = s.allCnt || 1;
+  const gw = (s.doneCnt / allC) * 100;
+  const yw = (s.skipCnt / allC) * 100;
+
+  const perDay = s.byCount
+    ? `每天 ${Math.ceil(s.leftCnt / s.days)} 节`
+    : `每天 ${hm(s.leftM / s.days)}`;
+  /* 还没到这门课的开始日，就别显示「每天要多少」，改成「几天后开始」 */
+  const notYet = t.start && TODAY_STR < t.start;
+  const tail = notYet
+    ? `${daysBetween(TODAY_STR, t.start)} 天后开始 · 一共需${s.byCount ? ` ${s.leftCnt} 节` : ` ${hm(s.leftM)}`}`
+    : `剩 ${s.days} 天 · ${perDay}`;
+
+  const info = s.byCount
+    ? `已看 ${s.doneCnt}/${s.needCnt} 节${s.skipCnt ? ` · 跳过 ${s.skipCnt}` : ""}　待学 ${s.leftCnt} 节　${tail}`
+    : `已看 ${hm(s.doneM)} / ${hm(s.needM)}${s.skipCnt ? ` · 跳过 ${s.skipCnt} 节` : ""}　待学 ${hm(s.leftM)}　${tail}`;
+
+  /* 默认只展开「第一个还有没看的」那一章，其余折叠 */
+  let firstOpen = 0;
+  outer: for (let gi = 0; gi < t.groups.length; gi++) {
+    for (let ii = 0; ii < t.groups[gi].items.length; ii++) {
+      if (stOf(t, gi, ii, t.groups[gi].items[ii]) === "") { firstOpen = gi; break outer; }
+    }
+  }
+
+  const body = t.groups.map((g, gi) => {
+    const gd = g.items.filter((it, ii) => stOf(t, gi, ii, it) === "d").length;
+    const gs = g.items.filter((it, ii) => stOf(t, gi, ii, it) === "s").length;
+    const rows = g.items.map((it, ii) => {
+      const st = stOf(t, gi, ii, it);
+      const cls = st === "d" ? "done" : st === "s" ? "skip" : "";
+      const mk = st === "d" ? "✓" : st === "s" ? "⏸" : "";
+      return `<div class="ti ${cls}" data-k="${tkey(t.id, gi, ii)}">
+        <span class="mk">${mk}</span>
+        <span class="tin">${it.n}</span>
+        ${it.m ? `<span class="tim">${it.m}′</span>` : ""}
+        <span class="tsk" data-k="${tkey(t.id, gi, ii)}" role="button" aria-label="暂不学">⏸</span>
+      </div>`;
+    }).join("");
+    return `<details class="tg"${gi === firstOpen ? " open" : ""}>
+      <summary>${g.g}<span>${gd}/${g.items.length}${gs ? ` · 跳过 ${gs}` : ""}</span></summary>
+      ${rows}
+    </details>`;
+  }).join("");
+
+  return `<div class="tk" data-tk="${t.id}">
+    <div class="tkhead">
+      <span class="tkt">${t.name}</span>
+      <span class="tksrc">${t.bv ? `<a href="https://www.bilibili.com/video/${t.bv}" target="_blank" rel="noopener">${t.bv}</a>` : "智慧树"}</span>
+      <span class="tkpct">${pct}%</span>
+    </div>
+    <div class="tkbar"><i class="g" style="width:${gw}%"></i><i class="y" style="width:${yw}%"></i></div>
+    <div class="tkinfo">${info}</div>
+    <button class="tkmore" data-tk="${t.id}">${OPENED.has(t.id) ? "收起清单" : "展开清单"}</button>
+    <div class="tkbody" id="tkb-${t.id}"${OPENED.has(t.id) ? "" : " hidden"}>${body}</div>
+  </div>`;
+}
+
+function bindTrack() {
+  document.querySelectorAll(".tkmore").forEach(b => {
+    b.addEventListener("click", () => {
+      const id = b.dataset.tk;
+      const box = document.getElementById("tkb-" + id);
+      if (!box) return;
+      box.hidden = !box.hidden;
+      b.textContent = box.hidden ? "展开清单" : "收起清单";
+      if (box.hidden) OPENED.delete(id); else OPENED.add(id);
+    });
+  });
+
+  document.querySelectorAll(".ti").forEach(row => {
+    row.addEventListener("click", e => {
+      const k = row.dataset.k;
+      const isSkipBtn = e.target.classList.contains("tsk");
+      const cur = TS[k] || (row.classList.contains("skip") ? "s" : row.classList.contains("done") ? "d" : "");
+      if (isSkipBtn) {
+        TS[k] = cur === "s" ? "" : "s";
+        if (TS[k] === "") delete TS[k];
+      } else {
+        if (cur === "d") { delete TS[k]; }
+        else { TS[k] = "d"; }
+      }
+      saveTS();
+      renderSubjects();
+    });
+  });
+}
+
 /* ---------- 渲染科目 ---------- */
 function renderSubjects() {
-  document.getElementById("subjects").innerHTML = SUBJECTS.map(s => `
+  document.getElementById("subjects").innerHTML = SUBJECTS.map(s => {
+    const tks = TRACK.filter(t => t.subject === s.name);
+    return `
     <div class="subj" style="--sc:${s.color}">
       <div class="top">
         <span class="nm">${s.name}</span>
         <span class="df">${s.diff} · ${s.days} 天</span>
       </div>
+      ${tks.length ? `<div class="tkwrap">${tks.map(trackHTML).join("")}</div>` : ""}
       <div class="why">${s.why}</div>
       ${s.res ? `<div class="res">${s.res}</div>` : ""}
       <div class="row">
@@ -289,7 +427,75 @@ function renderSubjects() {
         <span class="klist">${s.key.map(k => `<span>${k}</span>`).join("")}</span>
       </div>
       <div class="trap">易错：${s.trap}</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+  bindTrack();
+}
+
+/* ---------- 六级分项对照 ---------- */
+function renderCET6Parts() {
+  const box = document.getElementById("cetparts");
+  if (!box || typeof CET6_PARTS === "undefined") return;
+  box.innerHTML = `
+    <div class="cp-total">六级总分 ${CET6_TOTAL.full}　·　你四级 ${CET6_TOTAL.lv4}　·　目标 ${CET6_TOTAL.goal}</div>
+    <table class="cpt">
+      <thead><tr><th>分项</th><th>满分</th><th>四级</th><th>六级目标</th></tr></thead>
+      <tbody>${CET6_PARTS.map(p => `<tr>
+        <td class="cpk">${p.k}</td><td>${p.full}</td>
+        <td>${p.lv4 === null ? `<span class="cpm">${p.lv4r}</span>` : p.lv4}</td>
+        <td class="cpg">${p.goal}</td></tr>`).join("")}</tbody>
+    </table>
+    <div class="cp-acts">${CET6_PARTS.map(p => `<div class="cpa"><b>${p.k}</b>${p.act}</div>`).join("")}</div>`;
+}
+
+/* ---------- 备份：导出 / 导入 ---------- */
+function exportProgress() {
+  const all = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.indexOf("plan:v1:") === 0 || k === TK_KEY) all[k] = localStorage.getItem(k);
+  }
+  const blob = new Blob([JSON.stringify({ v: 1, at: new Date().toISOString(), data: all }, null, 2)],
+    { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "复习进度-" + TODAY_STR + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  const tip = document.getElementById("bk-tip");
+  if (tip) tip.textContent = "已导出 " + Object.keys(all).length + " 项，存到手机/电脑都行";
+}
+
+function importProgress(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const o = JSON.parse(r.result);
+      if (!o || !o.data) throw new Error("格式不对");
+      let n = 0;
+      Object.keys(o.data).forEach(k => {
+        if (k.indexOf("plan:v1:") === 0 || k === TK_KEY) { localStorage.setItem(k, o.data[k]); n++; }
+      });
+      const tip = document.getElementById("bk-tip");
+      if (tip) tip.textContent = "已导入 " + n + " 项，2 秒后刷新";
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) {
+      const tip = document.getElementById("bk-tip");
+      if (tip) tip.textContent = "这个文件读不出来，要选之前导出的 .json";
+    }
+  };
+  r.readAsText(file);
+}
+
+function bindBackup() {
+  const b1 = document.getElementById("bk-exp");
+  const b2 = document.getElementById("bk-imp");
+  const f = document.getElementById("bk-file");
+  if (b1) b1.addEventListener("click", exportProgress);
+  if (b2 && f) {
+    b2.addEventListener("click", () => f.click());
+    f.addEventListener("change", () => { if (f.files[0]) importProgress(f.files[0]); });
+  }
 }
 
 /* ---------- 规矩 ---------- */
@@ -315,6 +521,8 @@ function bindTabs() {
 renderCounters();
 renderToday();
 renderPlan();
+renderCET6Parts();
 renderSubjects();
 renderRules();
 bindTabs();
+bindBackup();
