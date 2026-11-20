@@ -296,20 +296,22 @@ function stOf(t, gi, ii, it) {
 }
 
 function trackStats(t) {
-  let doneCnt = 0, needCnt = 0, skipCnt = 0, doneM = 0, needM = 0, allCnt = 0;
+  let doneCnt = 0, needCnt = 0, skipCnt = 0, doneM = 0, needM = 0, skipM = 0, allCnt = 0;
   t.groups.forEach((g, gi) => g.items.forEach((it, ii) => {
     allCnt++;
     const s = stOf(t, gi, ii, it);
-    if (s === "s") { skipCnt++; return; }
+    if (s === "s") { skipCnt++; skipM += it.m || 0; return; }
     needCnt++;
     needM += it.m || 0;
     if (s === "d") { doneCnt++; doneM += it.m || 0; }
   }));
+  /* estMin：智慧树这类不给时长的课，按每节实测均值估算（t.estMin = 分钟/节） */
+  const est = t.estMin || 0;
   const byCount = !!t.byCount || needM === 0;
   const pct = needCnt ? doneCnt / needCnt : 1;
   const days = Math.max(1, daysBetween(TODAY_STR, t.due) + 1);
   return {
-    doneCnt, needCnt, skipCnt, allCnt, doneM, needM, pct, byCount, days,
+    doneCnt, needCnt, skipCnt, allCnt, doneM, needM, skipM, pct, byCount, days, est,
     leftM: Math.max(0, needM - doneM),
     leftCnt: Math.max(0, needCnt - doneCnt)
   };
@@ -325,18 +327,25 @@ function trackHTML(t) {
   const gw = (s.doneCnt / allC) * 100;
   const yw = (s.skipCnt / allC) * 100;
 
+  /* 时长文本：有真实时长的直接给，智慧树这类按每节均值估算的加「约」 */
+  const useEst = s.needM === 0 && s.est > 0;
+  const T = (cnt, min) => (useEst ? `约 ${hm(cnt * s.est)}` : hm(min));
+
   const perDay = s.byCount
     ? `每天 ${Math.ceil(s.leftCnt / s.days)} 节`
     : `每天 ${hm(s.leftM / s.days)}`;
   /* 还没到这门课的开始日，就别显示「每天要多少」，改成「几天后开始」 */
   const notYet = t.start && TODAY_STR < t.start;
   const tail = notYet
-    ? `${daysBetween(TODAY_STR, t.start)} 天后开始 · 一共需${s.byCount ? ` ${s.leftCnt} 节` : ` ${hm(s.leftM)}`}`
+    ? `${daysBetween(TODAY_STR, t.start)} 天后开始`
     : `剩 ${s.days} 天 · ${perDay}`;
 
-  const info = s.byCount
-    ? `已看 ${s.doneCnt}/${s.needCnt} 节${s.skipCnt ? ` · 跳过 ${s.skipCnt}` : ""}　待学 ${s.leftCnt} 节　${tail}`
-    : `已看 ${hm(s.doneM)} / ${hm(s.needM)}${s.skipCnt ? ` · 跳过 ${s.skipCnt} 节` : ""}　待学 ${hm(s.leftM)}　${tail}`;
+  const skipTxt = s.skipCnt
+    ? `　跳过 ${s.skipCnt} 节${s.skipM >= 1 || useEst ? " " + T(s.skipCnt, s.skipM) : ""}`
+    : "";
+
+  const info = `<div>共 ${T(s.needCnt, s.needM)}　已看 ${T(s.doneCnt, s.doneM)}　待学 ${T(s.leftCnt, s.leftM)}${skipTxt}</div>
+    <div class="tk2">${tail}</div>`;
 
   /* 默认只展开「第一个还有没看的」那一章，其余折叠 */
   let firstOpen = 0;
@@ -356,12 +365,17 @@ function trackHTML(t) {
       return `<div class="ti ${cls}" data-k="${tkey(t.id, gi, ii)}">
         <span class="mk">${mk}</span>
         <span class="tin">${it.n}</span>
-        ${it.m ? `<span class="tim">${it.m}′</span>` : ""}
+        ${it.m ? `<span class="tim">${Math.round(it.m)}′</span>` : ""}
         <span class="tsk" data-k="${tkey(t.id, gi, ii)}" role="button" aria-label="暂不学">⏸</span>
       </div>`;
     }).join("");
-    return `<details class="tg"${gi === firstOpen ? " open" : ""}>
-      <summary>${g.g}<span>${gd}/${g.items.length}${gs ? ` · 跳过 ${gs}` : ""}</span></summary>
+    /* 这一章合计要看多久（估时课按节数×均值） */
+    const gAll = g.items.reduce((a, it) => a + (it.m || 0), 0);
+    const gRaw = useEst ? g.items.length * s.est : gAll;
+    const gTxt = gRaw >= 1 ? (useEst ? `约 ${hm(gRaw)}` : hm(gRaw)) : "";
+    const allSkip = gs === g.items.length;
+    return `<details class="tg${allSkip ? " allskip" : ""}"${gi === firstOpen ? " open" : ""}>
+      <summary>${g.g}<span>${gTxt ? gTxt + " · " : ""}${gd}/${g.items.length}</span></summary>
       ${rows}
     </details>`;
   }).join("");
@@ -413,12 +427,27 @@ function bindTrack() {
 function renderSubjects() {
   document.getElementById("subjects").innerHTML = SUBJECTS.map(s => {
     const tks = TRACK.filter(t => t.subject === s.name);
+    /* 一门课有多套网课时（电工上＋下），给一行合计 */
+    let agg = null;
+    if (tks.length > 1) {
+      agg = { need: 0, done: 0, left: 0, est: false };
+      tks.forEach(t => {
+        const k = trackStats(t);
+        const f = k.needM === 0 && k.est > 0;
+        if (f) agg.est = true;
+        const need = k.needM || k.needCnt * k.est;
+        const done = k.doneM || k.doneCnt * k.est;
+        const left = k.leftM || k.leftCnt * k.est;
+        agg.need += need; agg.done += done; agg.left += left;
+      });
+    }
     return `
     <div class="subj" style="--sc:${s.color}">
       <div class="top">
         <span class="nm">${s.name}</span>
         <span class="df">${s.diff} · ${s.days} 天</span>
       </div>
+      ${agg ? `<div class="sum">${tks.length} 套网课合计 ${agg.est ? "约 " : ""}${hm(agg.need)}　已看 ${hm(agg.done)}　待学 ${hm(agg.left)}</div>` : ""}
       ${tks.length ? `<div class="tkwrap">${tks.map(trackHTML).join("")}</div>` : ""}
       <div class="why">${s.why}</div>
       ${s.res ? `<div class="res">${s.res}</div>` : ""}
