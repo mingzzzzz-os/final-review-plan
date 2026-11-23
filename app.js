@@ -121,9 +121,9 @@ function todayTasks() {
     tasks = CET6_WEEKDAY.map(x => ({ ...x }));
   }
 
-  /* 期末铺底：模考日和最后一周不加，免得挤掉六级 */
+  /* 期末铺底：模考日不加（免得挤掉六级）；铺底排到 12/11 为止，12/12 是六级考试 */
   const fo = FOUNDATION.find(f => inRange(TODAY_STR, f.from, f.to));
-  const skipFoundation = isMock || TODAY_STR >= "2026-12-07";
+  const skipFoundation = isMock || TODAY_STR > "2026-12-11";
   if (fo && !skipFoundation) {
     const fday = fo.days ? fo.days[daysBetween(fo.from, TODAY_STR)] : null;
     tasks.push({ t: "21:00-21:50", name: `期末铺底 · ${fo.subject}`, detail: fday || fo.task });
