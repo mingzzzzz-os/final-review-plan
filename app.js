@@ -27,7 +27,15 @@ const setDone = (d, arr) => localStorage.setItem(storeKey(d), JSON.stringify(arr
 /* ---------- 倒计时 ---------- */
 function renderCounters() {
   const c6 = daysBetween(TODAY_STR, CONFIG.cet6.slice(0, 10));
-  const fn = daysBetween(TODAY_STR, CONFIG.finalStart);
+  /* 「期末首场」= 考试表里第一场还没考的（材料 12/16 的线上窗口也算一场） */
+  const upcoming = EXAMS.filter(e => e.date >= TODAY_STR)
+    .slice().sort((x, y) => (x.date < y.date ? -1 : 1))[0];
+  const fn = daysBetween(TODAY_STR, upcoming ? upcoming.date : CONFIG.finalStart);
+  const lbl = document.querySelector("#c-fin .label span");
+  if (lbl && upcoming) {
+    lbl.textContent = upcoming.date.slice(5).replace("-", "/")
+      + (upcoming.subject.indexOf("材料") === 0 ? " 起" : "");
+  }
   const box = (id, v) => {
     const el = document.querySelector(id + " .num span");
     if (!el) return;
@@ -65,8 +73,7 @@ function todayTasks() {
 
   /* 阶段 E：考试周 */
   if (ph.id === "E") {
-    const idx = daysBetween(CONFIG.finalStart, TODAY_STR);
-    const ex = EXAMS[idx] || {};
+    const ex = EXAMS.find(e => e.date === TODAY_STR) || {};
     return {
       note: "考试周。今天考什么已经定了，就别再看别的科目。考完一门立刻放下，晚上只准备明天那门。",
       tasks: [
@@ -271,8 +278,8 @@ function renderPlan() {
         <span style="color:var(--soft);font-size:12px">　${e.note}</span></span>
     </div>`).join("")
     + `<p style="font-size:12.5px;color:var(--soft);margin:10px 0 0">
-        这六天是按 1/5–1/10 连续考估的。教务安排一出来，把日期和科目填进 data.js 的 EXAMS，
-        再按「先考的先二刷」调一下 D 阶段的顺序。</p>`;
+        材料 12/16–12/25 是线上窗口、电工 12/26 已定。剩下四门还按 1/5–1/10 连续考估着，
+        教务安排一出来，把日期和科目填进 data.js 的 EXAMS，再按「先考的先二刷」调 D 阶段的顺序。</p>`;
 }
 
 /* ==========================================================
